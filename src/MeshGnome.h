@@ -1,8 +1,9 @@
 #ifndef MESH_GNOME_H
 #define MESH_GNOME_H
 
-#include <EspProtoDisptach.h>
+#include <EspProtoDispatch.h>
 #include <MeshSyncMem.h>
 #include <EspMeshSyncSketch.h>
+#include <CustomProto.h>
 
 #endif
