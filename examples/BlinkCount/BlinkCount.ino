@@ -20,8 +20,8 @@
 MeshSyncMem blinkcount;
 MeshSyncSketch sketchUpdate(1 /* sketch version */);
 DispatchProto protos[] = {  //
-    {1, &sketchUpdate},
-    {2, &blinkcount}};
+  {1 /* protocol id */, &sketchUpdate},
+  {2 /* protocol id */, &blinkcount}};
 
 // If true, set LED_BUILTIN to LOW during blinks; otherwise set it to HIGH.
 static constexpr bool ON_IS_LOW = false;
@@ -38,6 +38,7 @@ void setup() {
   blinkcount.update(0 /* version */, "1");
 }
 
+// Number of blinks remaining before pausing and resetting.
 int blinkCountLeft = 0;
 
 void blinkLED() {
