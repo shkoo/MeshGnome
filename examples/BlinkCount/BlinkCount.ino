@@ -1,6 +1,4 @@
-#include <EspMeshSyncSketch.h>
-#include <EspProtoDispatch.h>
-#include <MeshSyncMem.h>
+#include <MeshGnome.h>
 
 // This simple example just blinks the builtin LED.  Upload this code
 // to multiple nodes, and they will synchronize via WiFi.
