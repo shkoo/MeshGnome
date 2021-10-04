@@ -107,6 +107,39 @@ test(lossyBigTransfer) {
   assertEqual(memsync2.localData(), bigData);
 }
 
+test(memConversionTest) {
+  struct A {
+    size_t a1;
+  };
+
+  FakeProtoDispatch d(eth_addr(123));
+  MeshSyncMem memsync;
+  DispatchProto protos[] = {{1, &memsync}};
+  d.begin(protos);
+
+  memsync.update(10, "Md", "D");
+
+  assertEqual(memsync.localMetadata(), "Md");
+  assertEqual(memsync.localData(), "D");
+
+  assertEqual(memsync.localMetadataBufferLen(), 2UL);
+  assertEqual(0, memcmp(memsync.localMetadataBuffer(), "Md", 2));
+
+  assertEqual(memsync.localDataBufferLen(), 1UL);
+  assertEqual(0, memcmp(memsync.localDataBuffer(), "D", 1));
+
+  /*  assertEqual(memsync.localMetadataAs<A>(), nullptr);
+
+  A aval;
+  aval.a1 = 5;
+
+  memsync.updateAs(11, aval);
+
+  assertTrue(memsync.localMetadataAs<A>());
+  assertEqual(memsync.localMetadataAs<A>()->a1, 5UL);
+  assertEqual(memsync.localMetadataSize(), sizeof(A));*/
+}
+
 void setup() {
 #if !defined(EPOXY_DUINO)
   delay(1000);  // wait to prevent garbage on SERIAL_PORT_MONITOR

@@ -64,3 +64,8 @@ misnomer (MeshGnomer?).
 * Clean up log messages to Serial, let users configure where they want them instead.
 
 * Add hook callbacks when synchronizations complete.
+
+* Add configurable advertise/retry intervals in synchronizers
+
+* Add time synchronization
+

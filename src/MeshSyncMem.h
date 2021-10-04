@@ -9,17 +9,26 @@
 // overhead.
 class MeshSyncMem : public MeshSync {
  public:
+  ~MeshSyncMem();
   // Update the synchronized data and metadata locally.  If the
   // version number is higher than neighboring nodes, this updated
   // data will be propagated.
-  void update(int version, String metadata, String data = String()) {
-    _metadata = std::move(metadata);
-    _data = std::move(data);
-    updateVersion(version, _data.length());
-  }
+  void update(int version, const uint8_t* metadata, size_t metadataLen,
+              const uint8_t* data = nullptr, size_t dataLen = 0);
+  void update(int version, String metadata, String data = String());
 
-  String localData() const { return _data; };
-  String localMetadata() const { return _metadata; };
+  // Returns data and metadata buffers as Arduino Strings.  These
+  // should not be used for binary data, as the Arduino String does
+  // not deal well with null characters.
+  String localData() const;
+  String localMetadata() const;
+
+  // Returns raw buffers.  These may be null if the sizes are 0.
+  const uint8_t* localDataBuffer() const { return _data; }
+  size_t localDataBufferLen() const { return _dataLen; }
+
+  const uint8_t* localMetadataBuffer() const { return _metadata; }
+  size_t localMetadataBufferLen() const { return _metadataLen; }
 
  private:
   bool startUpdate(size_t updateLen, int newVersion, const uint8_t* metadata,
@@ -30,11 +39,23 @@ class MeshSyncMem : public MeshSync {
   int provideUpdateMetadata(uint8_t* metadata, size_t maxlen) override;
   bool provideUpdateChunk(size_t offset, uint8_t* chunk, size_t size) override;
 
-  String _metadata;
-  String _data;
+  static void _copyBuf(const uint8_t* src, size_t srclen, uint8_t** dst, size_t* dstlen);
+  static String _bufToString(const uint8_t* buf, size_t buflen);
+  void _freeNew();
 
-  String _newMetadata;
-  String _newData;
+  uint8_t* _data = nullptr;
+  size_t _dataLen = 0;
+
+  uint8_t* _metadata = nullptr;
+  size_t _metadataLen = 0;
+
+  uint8_t* _newMetadata = nullptr;
+  size_t _newMetadataLen = 0;
+
+  uint8_t* _newData = nullptr;
+  size_t _newDataLen = 0;
+  size_t _newDataOffset = 0;
+
   int _newVersion;
 };
 
