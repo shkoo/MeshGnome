@@ -3,6 +3,7 @@
 
 #include <EspProtoDispatch.h>
 #include <MeshSyncMem.h>
+#include <MeshSyncStruct.h>
 #include <EspMeshSyncSketch.h>
 #include <CustomProto.h>
 

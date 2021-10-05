@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <FakeProtoDispatch.h>
 #include <MeshSyncMem.h>
+#include <MeshSyncStruct.h>
 
 using namespace aunit;
 
@@ -127,20 +128,48 @@ test(memConversionTest) {
 
   assertEqual(memsync.localDataBufferLen(), 1UL);
   assertEqual(0, memcmp(memsync.localDataBuffer(), "D", 1));
+}
 
-  /*  assertEqual(memsync.localMetadataAs<A>(), nullptr);
+test(structTest) {
+  struct T {
+    int v1 = 10;
+    size_t v2 = 20;
 
-  A aval;
-  aval.a1 = 5;
+    T() = default;
+    T(int initialV1) : v1(initialV1) {}
+  };
 
-  memsync.updateAs(11, aval);
+  FakeProtoDispatch d1(eth_addr(123));
+  MeshSyncStruct<T> sync1;
+  DispatchProto protos1[] = {{1, &sync1}};
 
-  assertTrue(memsync.localMetadataAs<A>());
-  assertEqual(memsync.localMetadataAs<A>()->a1, 5UL);
-  assertEqual(memsync.localMetadataSize(), sizeof(A));*/
+  FakeProtoDispatch d2(eth_addr(456));
+  MeshSyncStruct<T> sync2(5);
+  DispatchProto protos2[] = {{1, &sync2}};
+
+  d1.begin(protos1);
+  d2.begin(protos2);
+
+  assertEqual(sync1->v1, 10);
+  assertEqual(sync2->v1, 5);
+
+  sync2->v2 = 23;
+  sync2.push();
+
+  assertEqual(sync1.localVersion() + 1, sync2.localVersion());
+
+  runSome(20, {&d1, &d2});
+
+  assertEqual(sync1->v1, 5);
+  assertEqual(sync1->v2, 23UL);
+  assertEqual(sync2->v1, 5);
+  assertEqual(sync2->v2, 23UL);
+
+  assertEqual(sync1.localVersion(), sync2.localVersion());
 }
 
 void setup() {
+  TestRunner::setTimeout(30);
 #if !defined(EPOXY_DUINO)
   delay(1000);  // wait to prevent garbage on SERIAL_PORT_MONITOR
 #endif

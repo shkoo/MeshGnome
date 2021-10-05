@@ -32,6 +32,8 @@ class ProtoDispatchTarget {
   //
   // If this protocol doesn't need to send a packet right now, it should return -1.
   virtual int sendIfNeeded(uint8_t* ethaddr, uint8_t* pkt, size_t maxlen) = 0;
+
+  virtual ~ProtoDispatchTarget() = default;
 };
 
 using DispatchProto = std::pair<uint8_t /* protocol id */, ProtoDispatchTarget*>;

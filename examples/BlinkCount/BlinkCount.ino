@@ -15,11 +15,14 @@
 // of ON_IS_LOW so that blinks will be on instead of off or vice
 // versa.
 
-MeshSyncMem blinkcount;
+struct BlinkCountData {
+  int numBlinks = 1;
+};
+MeshSyncStruct<BlinkCountData> blinkcount;
 MeshSyncSketch sketchUpdate(1 /* sketch version */);
 DispatchProto protos[] = {  //
-  {1 /* protocol id */, &sketchUpdate},
-  {2 /* protocol id */, &blinkcount}};
+    {1 /* protocol id */, &sketchUpdate},
+    {2 /* protocol id */, &blinkcount}};
 
 // If true, set LED_BUILTIN to LOW during blinks; otherwise set it to HIGH.
 static constexpr bool ON_IS_LOW = false;
@@ -32,8 +35,6 @@ void setup() {
   EspProtoDispatch.begin(protos);
   Serial.printf("BlinkCount startup complete, running sketch version %d\n",
                 sketchUpdate.localVersion());
-  // Start with 1 blink.
-  blinkcount.update(0 /* version */, "1");
 }
 
 // Number of blinks remaining before pausing and resetting.
@@ -62,7 +63,7 @@ void blinkLED() {
   }
 
   if (blinkCountLeft < -4) {
-    blinkCountLeft = blinkcount.localMetadata().toInt();
+    blinkCountLeft = blinkcount->numBlinks;
     printf("Blinking %d times\n", blinkCountLeft);
   }
 }
@@ -76,11 +77,11 @@ void loop() {
     if (!newBlinks) {
       return;
     }
-    String oldBlinks = blinkcount.localMetadata();
-
+    int oldBlinks = blinkcount->numBlinks;
     int oldVersion = blinkcount.localVersion();
-    Serial.printf("Ok, blinks %s -> %d, configuration version=%d -> %d\n",
-                  oldBlinks ? oldBlinks.c_str() : "(none)", newBlinks, oldVersion, oldVersion + 1);
-    blinkcount.update(oldVersion + 1, String(newBlinks));
+    blinkcount->numBlinks = newBlinks;
+    blinkcount.push();
+    Serial.printf("Ok, blinks %d -> %d, configuration version=%d -> %d\n", oldBlinks, newBlinks,
+                  oldVersion, blinkcount.localVersion());
   }
 }
