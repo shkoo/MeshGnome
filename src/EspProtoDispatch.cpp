@@ -10,7 +10,9 @@
 EspProtoDispatchClass EspProtoDispatch;
 
 void EspProtoDispatchClass::_esp_now_recv_cb(u8* src, u8* data, u8 len) {
-  EspProtoDispatch.receivePacket(src, data, len);
+  static ProtoDispatchPktHdr protohdr;
+  memcpy(protohdr.src, src, 6);
+  EspProtoDispatch.receivePacket(&protohdr, data, len);
 }
 
 void EspProtoDispatchClass::_esp_now_send_cb(u8* dst, u8 status) {

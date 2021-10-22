@@ -45,7 +45,7 @@ class MeshSync : public ProtoDispatchTarget {
   size_t getNewSize() const { return _updateVersion.len; }
 
  private:
-  void onPacketReceived(const uint8_t* srcaddr, const uint8_t* pkt, size_t len) override;
+  void onPacketReceived(const ProtoDispatchPktHdr* srcaddr, const uint8_t* pkt, size_t len) override;
   void _onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);
   void _onRequest(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);
   void _onProvide(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);

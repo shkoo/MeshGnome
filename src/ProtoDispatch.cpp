@@ -1,6 +1,7 @@
 #include "ProtoDispatch.h"
 
-void ProtoDispatchBase::receivePacket(const uint8_t* src, const uint8_t* data, size_t len) {
+void ProtoDispatchBase::receivePacket(const ProtoDispatchPktHdr* hdr, const uint8_t* data,
+                                      size_t len) {
   if (len < 1) {
     // No protocol ID?
     return;
@@ -9,7 +10,7 @@ void ProtoDispatchBase::receivePacket(const uint8_t* src, const uint8_t* data, s
 
   for (const DispatchProto* target = _targetsStart; target != _targetsEnd; ++target) {
     if (target->first == protoId) {
-      target->second->onPacketReceived(src, data + 1, len - 1);
+      target->second->onPacketReceived(hdr, data + 1, len - 1);
     }
   }
 }

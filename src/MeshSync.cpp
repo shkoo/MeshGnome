@@ -7,20 +7,20 @@ MeshSync::MeshSync(int localVersion, size_t localSize) {
   _localVersion.len = localSize;
 }
 
-void MeshSync::onPacketReceived(const uint8_t* srcaddr, const uint8_t* pkt, size_t len) {
+void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* pkt, size_t len) {
   if (len < 1) {
     return;
   }
   Op op = (Op)pkt[0];
   switch (op) {
     case Op::ADVERTISE:
-      _onAdvertise(srcaddr, pkt + 1, len - 1);
+      _onAdvertise(hdr->src, pkt + 1, len - 1);
       break;
     case Op::REQUEST:
-      _onRequest(srcaddr, pkt + 1, len - 1);
+      _onRequest(hdr->src, pkt + 1, len - 1);
       break;
     case Op::PROVIDE:
-      _onProvide(srcaddr, pkt + 1, len - 1);
+      _onProvide(hdr->src, pkt + 1, len - 1);
       break;
     default:
       Serial.printf("Unknown mesh sync packet type %d recceived with length %d\n", int(op), len);

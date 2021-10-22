@@ -15,7 +15,9 @@ void FakeProtoDispatch::transmitAndReceive() {
 
     printf("Fake dispatch %s receiving a packet %p of length %lu from %s\n",
            _localAddress.str().c_str(), in.get(), in->data.size(), in->src.str().c_str());
-    receivePacket(in->src.addr, (const uint8_t*)in->data.data(), in->data.size());
+    static ProtoDispatchPktHdr hdr;
+    memcpy(hdr.src, in->src.addr, 6);
+    receivePacket(&hdr, (const uint8_t*)in->data.data(), in->data.size());
   }
 
   eth_addr dst;

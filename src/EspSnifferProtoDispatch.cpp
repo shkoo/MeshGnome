@@ -53,7 +53,10 @@ void EspSnifferProtoDispatchClass::_esp_sniffer_recv_cb(uint8_t *buf, uint16_t l
   u8 plen = *(data + 1) - 5;  // Length: The length is the total length of Organization Identifier,
                               // Type, Version and Body.
 
-  EspSnifferProtoDispatch.receivePacket(src, espdata, plen);
+  static ProtoDispatchPktHdr protohdr;
+  memcpy(&protohdr, src, 6);
+  protohdr.rssi = ppkt->rx_ctrl.rssi;
+  EspSnifferProtoDispatch.receivePacket(&protohdr, espdata, plen);
 }
 
 void EspSnifferProtoDispatchClass::_esp_now_send_cb(u8 *dst, u8 status) {
