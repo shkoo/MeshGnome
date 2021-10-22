@@ -3,10 +3,10 @@
 
 #if defined(ESP8266)
 
-#include "ieee80211_structs.h"
-
 #include <ESP8266WiFi.h>
 #include <espnow.h>
+
+#include "ieee80211_structs.h"
 #define WIFI_CHAN 1
 
 EspSnifferProtoDispatchClass EspSnifferProtoDispatch;
@@ -42,7 +42,7 @@ void EspSnifferProtoDispatchClass::_esp_sniffer_recv_cb(uint8_t *buf, uint16_t l
   // Only continue processing if this is an action frame containing the Espressif OUI.
   if ((wifi_mgmt_subtypes_t)frame_ctrl->subtype != ACTION ||  // action subtype match
       memcmp(data + 2, EspressifOUI, 3) != 0 ||               // OUI
-      *(data + 2 + 3) != EspressifType //||                     // Type
+      *(data + 2 + 3) != EspressifType                        //||                     // Type
       /*      (memcmp(hdr->addr1, broadcastAddress, MAC_SIZE) != 0) */) {
     return;
   }
@@ -122,9 +122,6 @@ void EspSnifferProtoDispatchClass::espTransmitIfNeeded() {
   }
 }
 
-void EspSnifferProtoDispatchClass::setRSSIHook(
-    const std::function<void(const uint8_t *src, uint8_t rssi)> &f) {
-  _rssi_hook = f;
-}
+void EspSnifferProtoDispatchClass::setRSSIHook(const rssi_hook_func_t &f) { _rssi_hook = f; }
 
 #endif

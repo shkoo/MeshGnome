@@ -11,7 +11,7 @@ bool etherIsBroadcast(const uint8_t* addr);
 
 struct ProtoDispatchPktHdr {
   uint8_t src[6] = {0, 0, 0, 0, 0, 0};
-  uint8_t rssi = 0;  // Filled in by some dispatchers (e.g. EspSnifferProtoDispatch)
+  int8_t rssi = 0;  // Filled in by some dispatchers (e.g. EspSnifferProtoDispatch)
 };
 
 class ProtoDispatchTarget {
