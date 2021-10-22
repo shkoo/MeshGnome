@@ -28,6 +28,13 @@ void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* p
   }
 }
 
+void MeshSync::_setUpdateInProgress(bool inprog) {
+  _updateInProgress = inprog;
+  if (_update_state_hook) {
+    _update_state_hook(inprog);
+  }
+}
+
 void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t len) {
   if (_updateInProgress) {
     // IDEA(nils): If we're in the middle of updating and we lose
@@ -48,7 +55,7 @@ void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t l
 
   if (startUpdate(_updateVersion.len, _updateVersion.version, pkt + sizeof(AdvertiseData),
                   len - sizeof(AdvertiseData))) {
-    _updateInProgress = true;
+    _setUpdateInProgress(true);
     memcpy(_updateEth, srcaddr, ETH_ADDR_LEN);
     _updateCurOffset = 0;
 
@@ -110,11 +117,11 @@ void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
   if (!res) {
     Serial.println("Receiving chunk failed");
     onUpdateAbort();
-    _updateInProgress = false;
+    _setUpdateInProgress(false);
     return;
   }
 #if VERBOSE
-   Serial.printf(" %u+%d/u", _updateCurOffset, chunkLen, _updateVersion.len);
+  Serial.printf(" %u+%d/u", _updateCurOffset, chunkLen, _updateVersion.len);
 #endif
   _updateCurOffset += chunkLen;
   _retryCount = 0;
@@ -128,7 +135,7 @@ void MeshSync::_checkUpdateComplete() {
   if (_updateCurOffset == _updateVersion.len) {
     Serial.println("\nUpdate complete!");
     onUpdateComplete();
-    _updateInProgress = false;
+    _setUpdateInProgress(false);
   }
 }
 
@@ -155,7 +162,7 @@ int MeshSync::_sendRequestIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
     ++_retryCount;
     if (_retryCount > MAX_RETRIES) {
       onUpdateAbort();
-      _updateInProgress = false;
+      _setUpdateInProgress(false);
       return -1;
     }
     _nextRetryTime = millis() + RETRY_INTERVAL_MS;
@@ -237,7 +244,7 @@ int MeshSync::_sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) 
 void MeshSync::updateVersion(int newLocalVersion, size_t newLocalSize) {
   if (_updateInProgress) {
     onUpdateAbort();
-    _updateInProgress = false;
+    _setUpdateInProgress(false);
   }
 
   // Don't serve old data
@@ -250,4 +257,8 @@ void MeshSync::updateVersion(int newLocalVersion, size_t newLocalSize) {
   _nextAdvertiseTime = millis();
 
   Serial.printf("Updated to version %u, size=%u\n", newLocalVersion, newLocalSize);
+}
+
+void MeshSync::setUpdateStateHook(const update_state_hook_func_t& f) {
+  _update_state_hook = f;
 }

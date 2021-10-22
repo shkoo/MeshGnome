@@ -1,6 +1,8 @@
 #ifndef MESH_SYNC_H
 #define MESH_SYNC_H
 
+#include <functional>
+
 #include "ProtoDispatch.h"
 
 class MeshSync : public ProtoDispatchTarget {
@@ -29,12 +31,16 @@ class MeshSync : public ProtoDispatchTarget {
 
   // For sending updates.  Provides the given chunk.  Does not need to
   // worry about bounds checking.
-  virtual bool provideUpdateChunk(size_t /* offset */, uint8_t* /* chunk */, size_t /* size of chunk */) {
+  virtual bool provideUpdateChunk(size_t /* offset */, uint8_t* /* chunk */,
+                                  size_t /* size of chunk */) {
     abort();
   };
 
   // Provides additional metadata to be included with the advertise message.
   virtual int provideUpdateMetadata(uint8_t* /* metadata */, size_t /* maxlen */) { return 0; }
+
+  using update_state_hook_func_t = std::function<void(bool /* true if updating, false if not */)>;
+  void setUpdateStateHook(const update_state_hook_func_t& f);
 
  protected:
   MeshSync(int localVersion = -1, size_t localSize = 0);
@@ -45,7 +51,8 @@ class MeshSync : public ProtoDispatchTarget {
   size_t getNewSize() const { return _updateVersion.len; }
 
  private:
-  void onPacketReceived(const ProtoDispatchPktHdr* srcaddr, const uint8_t* pkt, size_t len) override;
+  void onPacketReceived(const ProtoDispatchPktHdr* srcaddr, const uint8_t* pkt,
+                        size_t len) override;
   void _onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);
   void _onRequest(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);
   void _onProvide(const uint8_t* srcaddr, const uint8_t* pkt, size_t len);
@@ -55,6 +62,8 @@ class MeshSync : public ProtoDispatchTarget {
   int _sendRequestIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
   int _sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
   int _sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
+
+  void _setUpdateInProgress(bool inprog);
 
   enum class Op : uint8_t { ADVERTISE, REQUEST, PROVIDE };
 
@@ -74,6 +83,8 @@ class MeshSync : public ProtoDispatchTarget {
     size_t offset;
     // Data follows afterwards.
   };
+
+  update_state_hook_func_t _update_state_hook;
 
   AdvertiseData _localVersion;
 
