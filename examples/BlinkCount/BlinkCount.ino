@@ -15,6 +15,10 @@
 // of ON_IS_LOW so that blinks will be on instead of off or vice
 // versa.
 
+// Which dispatcher to use; sniffer or regular
+//#define DISPATCHER EspSnifferProtoDispatch
+#define DISPATCHER EspProtoDispatch
+
 struct BlinkCountData {
   int numBlinks = 1;
 };
@@ -32,7 +36,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
 
-  EspProtoDispatch.begin(protos);
+  DISPATCHER.begin(protos);
   Serial.printf("BlinkCount startup complete, running sketch version %d\n",
                 sketchUpdate.localVersion());
 }
@@ -70,7 +74,7 @@ void blinkLED() {
 
 void loop() {
   blinkLED();
-  EspProtoDispatch.espTransmitIfNeeded();
+  DISPATCHER.espTransmitIfNeeded();
 
   if (Serial.available()) {
     int newBlinks = Serial.parseInt();

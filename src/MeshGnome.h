@@ -2,6 +2,7 @@
 #define MESH_GNOME_H
 
 #include <EspProtoDispatch.h>
+#include <EspSnifferProtoDispatch.h>
 #include <MeshSyncMem.h>
 #include <MeshSyncStruct.h>
 #include <EspMeshSyncSketch.h>
