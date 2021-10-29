@@ -28,10 +28,20 @@ void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* p
   }
 }
 
-void MeshSync::_setUpdateInProgress(bool inprog) {
-  _updateInProgress = inprog;
-  if (_update_state_hook) {
-    _update_state_hook(inprog);
+void MeshSync::_updateStop(String msg) {
+  onUpdateAbort();
+  if (_update_stop_hook) {
+    _update_stop_hook(msg);
+  } else {
+    Serial.println(msg);
+  }
+  _updateInProgress = false;
+}
+
+void MeshSync::_updateProgress() {
+  _updateInProgress = true;
+  if (_receive_progress_hook) {
+    _receive_progress_hook(_updateCurOffset, _updateVersion.len);
   }
 }
 
@@ -55,7 +65,7 @@ void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t l
 
   if (startUpdate(_updateVersion.len, _updateVersion.version, pkt + sizeof(AdvertiseData),
                   len - sizeof(AdvertiseData))) {
-    _setUpdateInProgress(true);
+    _updateProgress();
     memcpy(_updateEth, srcaddr, ETH_ADDR_LEN);
     _updateCurOffset = 0;
 
@@ -115,9 +125,7 @@ void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
 
   bool res = receiveUpdateChunk(pkt + sizeof(ProvideData), chunkLen);
   if (!res) {
-    Serial.println("Receiving chunk failed");
-    onUpdateAbort();
-    _setUpdateInProgress(false);
+    _updateStop("Receiving chunk failed");
     return;
   }
 #if VERBOSE
@@ -134,8 +142,11 @@ void MeshSync::_checkUpdateComplete() {
   assert(_updateInProgress);
   if (_updateCurOffset == _updateVersion.len) {
     Serial.println("\nUpdate complete!");
+    if (_update_stop_hook) {
+      _update_stop_hook("Update complete");
+    }
     onUpdateComplete();
-    _setUpdateInProgress(false);
+    _updateInProgress = false;
   }
 }
 
@@ -161,8 +172,7 @@ int MeshSync::_sendRequestIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   if (timeIsAfter(millis(), _nextRetryTime)) {
     ++_retryCount;
     if (_retryCount > MAX_RETRIES) {
-      onUpdateAbort();
-      _setUpdateInProgress(false);
+      _updateStop("Retries exceeded");
       return -1;
     }
     _nextRetryTime = millis() + RETRY_INTERVAL_MS;
@@ -219,6 +229,10 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
     return -1;
   }
 
+  if (_transmit_progress_hook) {
+    _transmit_progress_hook(provide.offset, _localVersion.len);
+  }
+
   return 1 + sizeof(ProvideData) + chunkSize;
 }
 
@@ -243,8 +257,7 @@ int MeshSync::_sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) 
 
 void MeshSync::updateVersion(int newLocalVersion, size_t newLocalSize) {
   if (_updateInProgress) {
-    onUpdateAbort();
-    _setUpdateInProgress(false);
+    _updateStop("Different newer version encountered");
   }
 
   // Don't serve old data
@@ -259,6 +272,10 @@ void MeshSync::updateVersion(int newLocalVersion, size_t newLocalSize) {
   Serial.printf("Updated to version %u, size=%u\n", newLocalVersion, newLocalSize);
 }
 
-void MeshSync::setUpdateStateHook(const update_state_hook_func_t& f) {
-  _update_state_hook = f;
+void MeshSync::setReceiveProgressHook(const progress_hook_func_t& f) { _receive_progress_hook = f; }
+
+void MeshSync::setTransmitProgressHook(const progress_hook_func_t& f) {
+  _transmit_progress_hook = f;
 }
+
+void MeshSync::setUpdateStopHook(const update_stop_hook_func_t& f) { _update_stop_hook = f; }

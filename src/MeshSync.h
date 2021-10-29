@@ -39,8 +39,12 @@ class MeshSync : public ProtoDispatchTarget {
   // Provides additional metadata to be included with the advertise message.
   virtual int provideUpdateMetadata(uint8_t* /* metadata */, size_t /* maxlen */) { return 0; }
 
-  using update_state_hook_func_t = std::function<void(bool /* true if updating, false if not */)>;
-  void setUpdateStateHook(const update_state_hook_func_t& f);
+  using progress_hook_func_t = std::function<void(size_t /* offset */, size_t /* length */)>;
+  void setReceiveProgressHook(const progress_hook_func_t& f);
+  void setTransmitProgressHook(const progress_hook_func_t& f);
+
+  using update_stop_hook_func_t = std::function<void(String /* reason */)>;
+  void setUpdateStopHook(const update_stop_hook_func_t& f);
 
  protected:
   MeshSync(int localVersion = -1, size_t localSize = 0);
@@ -63,7 +67,8 @@ class MeshSync : public ProtoDispatchTarget {
   int _sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
   int _sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
 
-  void _setUpdateInProgress(bool inprog);
+  void _updateProgress();
+  void _updateStop(String mst);
 
   enum class Op : uint8_t { ADVERTISE, REQUEST, PROVIDE };
 
@@ -84,7 +89,9 @@ class MeshSync : public ProtoDispatchTarget {
     // Data follows afterwards.
   };
 
-  update_state_hook_func_t _update_state_hook;
+  progress_hook_func_t _receive_progress_hook;
+  progress_hook_func_t _transmit_progress_hook;
+  update_stop_hook_func_t _update_stop_hook;
 
   AdvertiseData _localVersion;
 
