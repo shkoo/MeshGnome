@@ -28,6 +28,7 @@ class EspSnifferProtoDispatchClass : public ProtoDispatchBase {
 
   bool _sendInProgress = false;
   uint8_t _lastPeer[ETH_ADDR_LEN] = {0, 0, 0, 0, 0, 0};
+  uint8_t _localAddr[ETH_ADDR_LEN] = {0, 0, 0, 0, 0, 0};
   rssi_hook_func_t _rssi_hook;
 };
 

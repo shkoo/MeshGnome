@@ -78,18 +78,24 @@ void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t l
 }
 
 void MeshSync::_onRequest(const uint8_t* /* srcaddr */, const uint8_t* pkt, size_t len) {
-  if (_updateInProgress) {
-    // Don't serve anything while we're updating ourselves.
-    return;
-  }
-
   if (len < sizeof(RequestData)) {
     return;
   }
 
   RequestData req;
   memcpy(&req, pkt, sizeof(RequestData));
+
   if (req.version != _localVersion.version) {
+    return;
+  }
+
+  if (_updateInProgress) {
+    // Don't serve anything while we're updating ourselves.  However,
+    // if someone else is requesting things, let them go first if they're farther along.
+    if (req.offset >= _updateCurOffset) {
+      _resetRetryTime();
+      _seenOther = true;
+    }
     return;
   }
 
@@ -105,6 +111,9 @@ void MeshSync::_onRequest(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
 
 void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size_t len) {
   if (!_updateInProgress) {
+    // Someone else is providing; let them do it.
+    _nextProvideTime = millis() + random(_retry_ms * 2, _retry_ms * 4);
+    _dataRequested = false;
     return;
   }
 
@@ -118,6 +127,8 @@ void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
     return;
   }
   if (prov.offset != _updateCurOffset) {
+    _resetRetryTime();
+    _seenOther = true;
     return;
   }
 
@@ -133,7 +144,13 @@ void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
 #endif
   _updateCurOffset += chunkLen;
   _retryCount = 0;
-  _nextRetryTime = millis();
+  _updateProgress();
+
+  if (_seenOther) {
+    _resetRetryTime();
+  } else {
+    _nextRetryTime = millis();
+  }
   _checkUpdateComplete();
 }
 
@@ -168,18 +185,22 @@ int MeshSync::sendIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   return -1;
 }
 
+void MeshSync::_resetRetryTime() { _nextRetryTime = millis() + random(_retry_ms, _retry_ms * 2); }
+
 int MeshSync::_sendRequestIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   if (timeIsAfter(millis(), _nextRetryTime)) {
     ++_retryCount;
-    if (_retryCount > MAX_RETRIES) {
+    if (_retryCount > _max_retries) {
       _updateStop("Retries exceeded");
       return -1;
     }
-    _nextRetryTime = millis() + RETRY_INTERVAL_MS;
+    _resetRetryTime();
+    _seenOther = false;
 
     assert(maxlen >= 1 + sizeof(RequestData));
 
-    memcpy(dst, _updateEth, ETH_ADDR_LEN);
+    // memcpy(dst, _updateEth, ETH_ADDR_LEN);
+    memset(dst, 0xff, ETH_ADDR_LEN);
 
     RequestData req;
     req.version = _updateVersion.version;
@@ -198,11 +219,15 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
     return -1;
   }
 
-  _dataRequested = false;
-
   if (_updateInProgress) {
+    _dataRequested = false;
     return -1;
   }
+
+  if (!timeIsAfter(millis(), _nextProvideTime)) {
+    return -1;
+  }
+  _nextProvideTime = millis();
 
   assert(maxlen >= 1 + sizeof(ProvideData));
   pkt[0] = int(Op::PROVIDE);
@@ -221,7 +246,6 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   }
 
   _dataRequested = false;
-  _maxRequestedOffset = 0;
 
   bool res = provideUpdateChunk(provide.offset, pkt + 1 + sizeof(ProvideData), chunkSize);
   if (!res) {
@@ -238,7 +262,7 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
 
 int MeshSync::_sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   if (timeIsAfter(millis(), _nextAdvertiseTime)) {
-    _nextAdvertiseTime = millis() + ADVERTISE_INTERVAL_MS;
+    _nextAdvertiseTime = millis() + random(_advertise_ms, 2 * _advertise_ms);
     pkt[0] = int(Op::ADVERTISE);
     memset(dst, 0xff, 6);  // broadcast to everyone!
     assert(maxlen >= 1 + sizeof(AdvertiseData));

@@ -45,12 +45,16 @@ bool MeshSyncSketch::receiveUpdateChunk(const uint8_t* chunk, size_t chunklen) {
 void MeshSyncSketch::onUpdateAbort() {
   Serial.printf("Aborting firmware update\n");
   Update.end();
+  // Update can get in a bad state; reset and try again later.
+  ESP.reset();
 }
 
 void MeshSyncSketch::onUpdateComplete() {
   if (!Update.end()) {
     Serial.print("MeshSyncSketch: Update failed: ");
     Update.printError(Serial);
+    // Update can get in a bad state; reset and try again later.
+    ESP.reset();
   } else {
     Serial.println("Firmware update complete! Restarting.");
     ESP.reset();

@@ -53,6 +53,11 @@ void EspSnifferProtoDispatchClass::_esp_sniffer_recv_cb(uint8_t *buf, uint16_t l
   u8 plen = *(data + 1) - 5;  // Length: The length is the total length of Organization Identifier,
                               // Type, Version and Body.
 
+  if (memcmp(src, EspSnifferProtoDispatch._localAddr, 6) == 0) {
+    // Don't process packets we transmitted ourself.
+    return;
+  }
+
   static ProtoDispatchPktHdr protohdr;
   memcpy(&protohdr.src, src, 6);
   protohdr.rssi = ppkt->rx_ctrl.rssi;
@@ -71,6 +76,10 @@ void EspSnifferProtoDispatchClass::protoDispatchBegin() {
   wifi_set_channel(1);
   wifi_set_opmode(STATION_MODE);
   wifi_promiscuous_enable(0);
+  if (!wifi_get_macaddr(0, _localAddr)) {
+    Serial.println("Error getting local address");
+  }
+
   WiFi.disconnect();
 
   if (esp_now_init() != 0) {

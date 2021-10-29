@@ -7,13 +7,18 @@
 
 class MeshSync : public ProtoDispatchTarget {
  public:
-#if defined(EPOXY_DUINO)
-  static constexpr uint32_t RETRY_INTERVAL_MS = 100;
-#else
-  static constexpr uint32_t RETRY_INTERVAL_MS = 1000;
-#endif
-  static constexpr uint32_t ADVERTISE_INTERVAL_MS = 15 * 1000;
-  static constexpr uint8_t MAX_RETRIES = 5;
+  // Sets the number of milliseconds between retries.  The actual
+  // interval will be a random interval between 1 and 2 times this
+  // number to avoid synchronization issues.
+  void retryMs(uint32_t ms) { _retry_ms = ms; }
+
+  // Sets the number of milliseconds between advertisements.  The
+  // actual interval will be a random interval between 1 and 2 times
+  // this number to avoid synchronization issues.
+  void advertiseMs(uint32_t ms) { _advertise_ms = ms; }
+
+  // Sets maximum number of retries before giving up.
+  void maxRetries(uint32_t retries) { _max_retries = retries; }
 
   int localVersion() const { return _localVersion.version; }
   size_t localSize() const { return _localVersion.len; }
@@ -70,6 +75,8 @@ class MeshSync : public ProtoDispatchTarget {
   void _updateProgress();
   void _updateStop(String mst);
 
+  void _resetRetryTime();
+
   enum class Op : uint8_t { ADVERTISE, REQUEST, PROVIDE };
 
   struct AdvertiseData {
@@ -93,6 +100,10 @@ class MeshSync : public ProtoDispatchTarget {
   progress_hook_func_t _transmit_progress_hook;
   update_stop_hook_func_t _update_stop_hook;
 
+  uint32_t _retry_ms = 300;
+  uint32_t _advertise_ms = 15000;
+  uint32_t _max_retries = 100;
+
   AdvertiseData _localVersion;
 
   uint32_t _nextAdvertiseTime = 0;
@@ -103,12 +114,13 @@ class MeshSync : public ProtoDispatchTarget {
   uint8_t _updateEth[ETH_ADDR_LEN];
   size_t _updateCurOffset = 0;
   size_t _nextRetryTime = 0;
-
+  bool _seenOther = false;
   uint8_t _retryCount = 0;
 
   // For sending updates
   bool _dataRequested = false;  // True if a client wants some of our data.
   size_t _maxRequestedOffset = 0;
+  uint32_t _nextProvideTime = 0;
 };
 
 #endif
