@@ -48,7 +48,7 @@ void EspSnifferProtoDispatchClass::_esp_sniffer_recv_cb(uint8_t *buf, uint16_t l
   }
 
   const wifi_pkt_mgmt_t *mpkt = (wifi_pkt_mgmt_t *)&ipkt->payload;
-  u8 *src = (u8 *)&hdr->addr1;
+  u8 *src = (u8 *)&hdr->addr2;
   u8 *espdata = (u8 *)(data + 7);
   u8 plen = *(data + 1) - 5;  // Length: The length is the total length of Organization Identifier,
                               // Type, Version and Body.
