@@ -2,9 +2,13 @@
 
 #include <stdio.h>
 
+// If true, update stragglers first.
+static constexpr bool k_lower_first = true;
+
 MeshSync::MeshSync(int localVersion, size_t localSize) {
   _localVersion.version = localVersion;
   _localVersion.len = localSize;
+  _nextProvideTime = millis() + random(_retry_ms, 2 * _retry_ms);
 }
 
 void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* pkt, size_t len) {
@@ -85,22 +89,25 @@ void MeshSync::_onRequest(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
   RequestData req;
   memcpy(&req, pkt, sizeof(RequestData));
 
-  if (req.version != _localVersion.version) {
-    return;
-  }
-
   if (_updateInProgress) {
+    if (req.version != _updateVersion.version) {
+      return;
+    }
     // Don't serve anything while we're updating ourselves.  However,
     // if someone else is requesting things, let them go first if they're farther along.
-    if (req.offset >= _updateCurOffset) {
+    if (k_lower_first ? (req.offset <= _updateCurOffset) : (req.offset >= _updateCurOffset)) {
       _resetRetryTime();
       _seenOther = true;
     }
     return;
   }
 
+  if (req.version != _localVersion.version) {
+    return;
+  }
+
   if (_dataRequested) {
-    if (req.offset > _maxRequestedOffset) {
+    if (k_lower_first ? (req.offset < _maxRequestedOffset) : (req.offset > _maxRequestedOffset)) {
       _maxRequestedOffset = req.offset;
     }
   } else {
@@ -127,8 +134,10 @@ void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
     return;
   }
   if (prov.offset != _updateCurOffset) {
-    _resetRetryTime();
-    _seenOther = true;
+    if (k_lower_first ? (prov.offset < _updateCurOffset) : (prov.offset > _updateCurOffset)) {
+      _resetRetryTime();
+      _seenOther = true;
+    }
     return;
   }
 
