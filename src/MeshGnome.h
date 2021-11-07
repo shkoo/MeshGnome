@@ -6,6 +6,7 @@
 #include <MeshSyncMem.h>
 #include <MeshSyncStruct.h>
 #include <EspMeshSyncSketch.h>
+#include <MeshSyncTime.h>
 #include <CustomProto.h>
 
 #endif
