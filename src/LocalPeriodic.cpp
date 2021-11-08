@@ -1,5 +1,7 @@
 #include "LocalPeriodic.h"
 
+#include <limits>
+
 void LocalPeriodicBuf::begin(const MeshSyncTime* timeSource, uint32_t everyMs) {
   _timeSource = timeSource;
   _everyMs = everyMs;
