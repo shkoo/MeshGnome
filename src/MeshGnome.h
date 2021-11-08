@@ -8,5 +8,6 @@
 #include <EspMeshSyncSketch.h>
 #include <MeshSyncTime.h>
 #include <CustomProto.h>
+#include <LocalPeriodic.h>
 
 #endif
