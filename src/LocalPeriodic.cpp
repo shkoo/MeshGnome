@@ -13,12 +13,12 @@ void LocalPeriodicBuf::run() {
     return;
   }
   uint32_t syncedMillis = _timeSource->syncedMillis();
-  uint32_t timeSinceLast = syncedMillis - _lastRun;
+  uint32_t addedTime = _everyMs + syncedMillis - _lastRun;
   //    printf("%u time since last %u: %u\n", synced, _lastRun, timeSinceLast);
-  if (timeSinceLast < _everyMs) {
+  if (addedTime < _everyMs*2) {
     return;
   }
-  if (timeSinceLast > 2 * _everyMs || (_lastRun > 0 && _lastRun < _everyMs)) {
+  if (addedTime > 3 * _everyMs) {
     //      printf("oob; resyncing\n");
     _synced = false;
   }
