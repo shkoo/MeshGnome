@@ -19,16 +19,18 @@ class LocalPeriodicBuf : public ProtoDispatchTarget {
   int sendIfNeeded(uint8_t* ethaddr, uint8_t* pkt, size_t maxlen) override;
 
  private:
+  void _scheduleNextTimeStep();
+
   const MeshSyncTime* _timeSource = nullptr;
   bool _synced = false;
 
   uint32_t _everyMs = 0;
 
   // Next time to broadcast in local time
-  uint32_t _nextBroadcastMillis = 0;
+  uint32_t _nextBroadcast = 0;
 
-  // Last time step in synced time.
-  uint32_t _lastRun = 0;
+  // Next time step in local time.
+  uint32_t _nextTimeStep = 0;
 };
 
 template <typename T>

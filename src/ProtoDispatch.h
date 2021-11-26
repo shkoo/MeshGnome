@@ -9,6 +9,9 @@
 
 bool etherIsBroadcast(const uint8_t* addr);
 
+// Converts the given ethernet address to a string for easy printing
+String etherToString(const uint8_t* addr);
+
 struct ProtoDispatchPktHdr {
   uint8_t src[6] = {0, 0, 0, 0, 0, 0};
   int8_t rssi = 0;  // Filled in by some dispatchers (e.g. EspSnifferProtoDispatch)

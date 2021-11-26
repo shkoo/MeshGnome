@@ -6,35 +6,34 @@ void LocalPeriodicBuf::begin(const MeshSyncTime* timeSource, uint32_t everyMs) {
   _timeSource = timeSource;
   _everyMs = everyMs;
   _synced = false;
+  _scheduleNextTimeStep();
 }
 
 void LocalPeriodicBuf::run() {
   if (!_everyMs || !_timeSource) {
     return;
   }
-  uint32_t syncedMillis = _timeSource->syncedMillis();
-  uint32_t addedTime = _everyMs + syncedMillis - _lastRun;
-  //    printf("%u time since last %u: %u\n", synced, _lastRun, timeSinceLast);
-  if (addedTime < _everyMs*2) {
+
+  uint32_t now = millis();
+  if (!timeIsAfter(now, _nextTimeStep)) {
     return;
   }
-  if (addedTime > 3 * _everyMs) {
-    //      printf("oob; resyncing\n");
-    _synced = false;
-  }
-
-  if (_synced) {
-    _lastRun += _everyMs;
-  } else {
-    _lastRun = syncedMillis;
-    _lastRun -= _lastRun % _everyMs;
-    _synced = true;
-  }
-  // Send sometime in the middle 3/5ths of the step time period, but
-  // randomly so we're less likely to step on other local
-  // broadcasters.
-  _nextBroadcastMillis = millis() + random(_everyMs * 1 / 5, _everyMs * 4 / 5);
   onTimeStep();
+  _scheduleNextTimeStep();
+}
+
+void LocalPeriodicBuf::_scheduleNextTimeStep() {
+  assert(_everyMs > 0);
+  uint32_t now = millis();
+  uint32_t synced = _timeSource->localToSynced(now);
+  // If we don't have time to transmit, wait until the next interval to start.
+  uint32_t intervalStart = synced + (_everyMs * 4 / 5);
+  intervalStart -= intervalStart % _everyMs;
+
+  _nextBroadcast = _timeSource->syncedToLocal(
+      random(intervalStart + _everyMs * 1 / 5, intervalStart + _everyMs * 4 / 5));
+
+  _nextTimeStep = _timeSource->syncedToLocal(intervalStart + _everyMs);
 }
 
 void LocalPeriodicBuf::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* pkt,
@@ -43,12 +42,11 @@ void LocalPeriodicBuf::onPacketReceived(const ProtoDispatchPktHdr* hdr, const ui
 }
 
 int LocalPeriodicBuf::sendIfNeeded(uint8_t* ethaddr, uint8_t* pkt, size_t maxlen) {
-  uint32_t timeAfterNext = millis() - _nextBroadcastMillis;
-  if (timeAfterNext > _everyMs) {
+  if (!timeIsAfter(millis(), _nextBroadcast)) {
     return -1;
   }
-  // Don't broadcast again until next time step.
-  _nextBroadcastMillis += std::numeric_limits<uint32_t>::max() / 2;
+  // Don't broadcast again until next time step.  This probably won't end up being the final time.
+  _nextBroadcast += _everyMs;
   int res = onTransmitBuf(pkt, maxlen);
   if (res < 0) {
     return res;

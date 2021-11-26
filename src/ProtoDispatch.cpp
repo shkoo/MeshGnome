@@ -1,5 +1,7 @@
 #include "ProtoDispatch.h"
 
+#include <cstdio>
+
 void ProtoDispatchBase::receivePacket(const ProtoDispatchPktHdr* hdr, const uint8_t* data,
                                       size_t len) {
   if (len < 1) {
@@ -38,4 +40,11 @@ bool etherIsBroadcast(const uint8_t* addr) {
     }
   }
   return true;
+}
+
+String etherToString(const uint8_t* addr) {
+  char buf[3 * 6 + 1];
+  sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4],
+          addr[5]);
+  return buf;
 }
