@@ -10,18 +10,36 @@ class MeshSync : public ProtoDispatchTarget {
   // Sets the number of milliseconds between retries.  The actual
   // interval will be a random interval between 1 and 2 times this
   // number to avoid synchronization issues.
-  void retryMs(uint32_t ms) { _retry_ms = ms; }
+  void retryMs(uint32_t ms) { _retryMs = ms; }
 
   // Sets the number of milliseconds between advertisements.  The
   // actual interval will be a random interval between 1 and 2 times
   // this number to avoid synchronization issues.
-  void advertiseMs(uint32_t ms) { _advertise_ms = ms; }
+  void advertiseMs(uint32_t ms) { _advertiseMs = ms; }
+
+  // Sets the number of milliseconds to initially wait for an upgrade
+  // upon startup before setting _upToDate.
+  void initialUpgradeMs(uint32_t ms) { _initialUpgradeMs = ms; }
 
   // Sets maximum number of retries before giving up.
-  void maxRetries(uint32_t retries) { _max_retries = retries; }
+  void maxRetries(uint32_t retries) { _maxRetries = retries; }
 
   int localVersion() const { return _localVersion.version; }
   size_t localSize() const { return _localVersion.len; }
+
+  // Returns true if the local version is up to date with what is available on the network.
+  //
+  // If any of the following conditions happen, the local version is not up to date:
+  //
+  // * An advertisement for a newer version has been seen.
+  // * An update is currently in progress
+  // * Less than _initialUpgradeMs has passed since startup and we haven't
+  //   seen anything else on the network that's not newer than we have.
+  //
+  // This is useful for e.g. sketch upgrades, where if you're out of
+  // date you want to upgrade immediately in case the old version has
+  // some kind of crashing bug that interrupts updates.
+  bool upToDate() const;
 
   // For receiving updates:
   // Returns false if update should be aborted.
@@ -48,8 +66,8 @@ class MeshSync : public ProtoDispatchTarget {
   void setReceiveProgressHook(const progress_hook_func_t& f);
   void setTransmitProgressHook(const progress_hook_func_t& f);
 
-  using update_stop_hook_func_t = std::function<void(String /* reason */)>;
-  void setUpdateStopHook(const update_stop_hook_func_t& f);
+  using updateStopHook_func_t = std::function<void(String /* reason */)>;
+  void setUpdateStopHook(const updateStopHook_func_t& f);
 
  protected:
   MeshSync(int localVersion = -1, size_t localSize = 0);
@@ -73,7 +91,8 @@ class MeshSync : public ProtoDispatchTarget {
   int _sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen);
 
   void _updateProgress();
-  void _updateStop(String mst);
+  void _updateUpToDate();
+  void _updateStop(String msg);
 
   void _resetRetryTime();
 
@@ -96,25 +115,33 @@ class MeshSync : public ProtoDispatchTarget {
     // Data follows afterwards.
   };
 
-  progress_hook_func_t _receive_progress_hook;
-  progress_hook_func_t _transmit_progress_hook;
-  update_stop_hook_func_t _update_stop_hook;
+  progress_hook_func_t _receiveProgressHook;
+  progress_hook_func_t _transmitProgressHook;
+  updateStopHook_func_t _updateStopHook;
 
-  uint32_t _retry_ms = 300;
-  uint32_t _advertise_ms = 15000;
-  uint32_t _max_retries = 100;
+  uint32_t _retryMs = 300;
+  uint32_t _advertiseMs = 15000;
+  uint32_t _initialUpgradeMs = 1000;
+  uint32_t _maxRetries = 100;
 
   AdvertiseData _localVersion;
 
+  uint32_t _startTime = 0;
   uint32_t _nextAdvertiseTime = 0;
 
   // For receiving updates
-  bool _updateInProgress = false;
+  bool _updateInProgress : 1 = false;
+  bool _seenNewerVersion : 1 = false;
+  bool _seenThisOrOlderVersion : 1 = false;
+
+  // True if someone else is advertising or upgrading; in this case we
+  // won't compete for network.
+  bool _seenOther : 1 = false;
+
   AdvertiseData _updateVersion;
   uint8_t _updateEth[ETH_ADDR_LEN];
   size_t _updateCurOffset = 0;
   size_t _nextRetryTime = 0;
-  bool _seenOther = false;
   uint8_t _retryCount = 0;
 
   // For sending updates

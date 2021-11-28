@@ -8,7 +8,8 @@ static constexpr bool k_lower_first = true;
 MeshSync::MeshSync(int localVersion, size_t localSize) {
   _localVersion.version = localVersion;
   _localVersion.len = localSize;
-  _nextProvideTime = millis() + random(_retry_ms, 2 * _retry_ms);
+  _nextProvideTime = millis() + random(0, _initialUpgradeMs / 2);
+  _startTime = millis();
 }
 
 void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* pkt, size_t len) {
@@ -34,8 +35,8 @@ void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* p
 
 void MeshSync::_updateStop(String msg) {
   onUpdateAbort();
-  if (_update_stop_hook) {
-    _update_stop_hook(msg);
+  if (_updateStopHook) {
+    _updateStopHook(msg);
   } else {
     Serial.println(msg);
   }
@@ -44,9 +45,31 @@ void MeshSync::_updateStop(String msg) {
 
 void MeshSync::_updateProgress() {
   _updateInProgress = true;
-  if (_receive_progress_hook) {
-    _receive_progress_hook(_updateCurOffset, _updateVersion.len);
+  if (_receiveProgressHook) {
+    _receiveProgressHook(_updateCurOffset, _updateVersion.len);
   }
+}
+
+bool MeshSync::upToDate() const {
+  if (_updateInProgress) {
+    return false;
+  }
+
+  if (_seenNewerVersion) {
+    return false;
+  }
+
+  if (_seenThisOrOlderVersion) {
+    // Something else on the network hasn't been upgraded, so maybe we won't need to upgrade.
+    return true;
+  }
+
+  if ((millis() - _startTime) < _initialUpgradeMs) {
+    // Wait _initialUpgradeMs to try and make sure we have a recent version.
+    return false;
+  }
+
+  return true;
 }
 
 void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t len) {
@@ -64,8 +87,17 @@ void MeshSync::_onAdvertise(const uint8_t* srcaddr, const uint8_t* pkt, size_t l
   memcpy(&_updateVersion, pkt, sizeof(AdvertiseData));
 
   if (_updateVersion.version <= _localVersion.version) {
+    _seenThisOrOlderVersion = true;
+    if (_updateVersion.version < _localVersion.version &&
+        (_nextAdvertiseTime - millis()) > (_initialUpgradeMs / 2)) {
+      // Something just appeared with an old version; make sure they're aware right away that
+      // there's a new one.
+      _nextAdvertiseTime = millis() + random(0, _initialUpgradeMs / 2);
+    }
     return;
   }
+
+  _seenNewerVersion = true;
 
   if (startUpdate(_updateVersion.len, _updateVersion.version, pkt + sizeof(AdvertiseData),
                   len - sizeof(AdvertiseData))) {
@@ -119,7 +151,7 @@ void MeshSync::_onRequest(const uint8_t* /* srcaddr */, const uint8_t* pkt, size
 void MeshSync::_onProvide(const uint8_t* /* srcaddr */, const uint8_t* pkt, size_t len) {
   if (!_updateInProgress) {
     // Someone else is providing; let them do it.
-    _nextProvideTime = millis() + random(_retry_ms * 2, _retry_ms * 4);
+    _nextProvideTime = millis() + random(_retryMs * 2, _retryMs * 4);
     _dataRequested = false;
     return;
   }
@@ -168,11 +200,13 @@ void MeshSync::_checkUpdateComplete() {
   assert(_updateInProgress);
   if (_updateCurOffset == _updateVersion.len) {
     Serial.println("\nUpdate complete!");
-    if (_update_stop_hook) {
-      _update_stop_hook("Update complete");
+    if (_updateStopHook) {
+      _updateStopHook("Update complete");
     }
     onUpdateComplete();
     _updateInProgress = false;
+    _seenNewerVersion = false;
+    _seenThisOrOlderVersion = true;
   }
 }
 
@@ -194,12 +228,12 @@ int MeshSync::sendIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   return -1;
 }
 
-void MeshSync::_resetRetryTime() { _nextRetryTime = millis() + random(_retry_ms, _retry_ms * 2); }
+void MeshSync::_resetRetryTime() { _nextRetryTime = millis() + random(_retryMs, _retryMs * 2); }
 
 int MeshSync::_sendRequestIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   if (timeIsAfter(millis(), _nextRetryTime)) {
     ++_retryCount;
-    if (_retryCount > _max_retries) {
+    if (_retryCount > _maxRetries) {
       _updateStop("Retries exceeded");
       return -1;
     }
@@ -262,8 +296,8 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
     return -1;
   }
 
-  if (_transmit_progress_hook) {
-    _transmit_progress_hook(provide.offset, _localVersion.len);
+  if (_transmitProgressHook) {
+    _transmitProgressHook(provide.offset, _localVersion.len);
   }
 
   return 1 + sizeof(ProvideData) + chunkSize;
@@ -271,7 +305,7 @@ int MeshSync::_sendProvideIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
 
 int MeshSync::_sendAdvertiseIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
   if (timeIsAfter(millis(), _nextAdvertiseTime)) {
-    _nextAdvertiseTime = millis() + random(_advertise_ms, 2 * _advertise_ms);
+    _nextAdvertiseTime = millis() + random(_advertiseMs, 2 * _advertiseMs);
     pkt[0] = int(Op::ADVERTISE);
     memset(dst, 0xff, 6);  // broadcast to everyone!
     assert(maxlen >= 1 + sizeof(AdvertiseData));
@@ -305,10 +339,8 @@ void MeshSync::updateVersion(int newLocalVersion, size_t newLocalSize) {
   Serial.printf("Updated to version %u, size=%u\n", newLocalVersion, newLocalSize);
 }
 
-void MeshSync::setReceiveProgressHook(const progress_hook_func_t& f) { _receive_progress_hook = f; }
+void MeshSync::setReceiveProgressHook(const progress_hook_func_t& f) { _receiveProgressHook = f; }
 
-void MeshSync::setTransmitProgressHook(const progress_hook_func_t& f) {
-  _transmit_progress_hook = f;
-}
+void MeshSync::setTransmitProgressHook(const progress_hook_func_t& f) { _transmitProgressHook = f; }
 
-void MeshSync::setUpdateStopHook(const update_stop_hook_func_t& f) { _update_stop_hook = f; }
+void MeshSync::setUpdateStopHook(const updateStopHook_func_t& f) { _updateStopHook = f; }
