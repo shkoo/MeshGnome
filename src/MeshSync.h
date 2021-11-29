@@ -121,7 +121,7 @@ class MeshSync : public ProtoDispatchTarget {
 
   uint32_t _retryMs = 300;
   uint32_t _advertiseMs = 15000;
-  uint32_t _initialUpgradeMs = 1000;
+  uint32_t _initialUpgradeMs = 2000;
   uint32_t _maxRetries = 100;
 
   AdvertiseData _localVersion;
@@ -130,13 +130,13 @@ class MeshSync : public ProtoDispatchTarget {
   uint32_t _nextAdvertiseTime = 0;
 
   // For receiving updates
-  bool _updateInProgress : 1 = false;
-  bool _seenNewerVersion : 1 = false;
-  bool _seenThisOrOlderVersion : 1 = false;
+  bool _updateInProgress = false;
+  bool _seenNewerVersion = false;
+  bool _seenThisOrOlderVersion = false;
 
   // True if someone else is advertising or upgrading; in this case we
   // won't compete for network.
-  bool _seenOther : 1 = false;
+  bool _seenOther = false;
 
   AdvertiseData _updateVersion;
   uint8_t _updateEth[ETH_ADDR_LEN];

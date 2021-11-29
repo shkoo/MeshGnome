@@ -9,7 +9,6 @@ MeshSync::MeshSync(int localVersion, size_t localSize) {
   _localVersion.version = localVersion;
   _localVersion.len = localSize;
   _nextProvideTime = millis() + random(0, _initialUpgradeMs / 2);
-  _startTime = millis();
 }
 
 void MeshSync::onPacketReceived(const ProtoDispatchPktHdr* hdr, const uint8_t* pkt, size_t len) {
@@ -64,11 +63,10 @@ bool MeshSync::upToDate() const {
     return true;
   }
 
-  if ((millis() - _startTime) < _initialUpgradeMs) {
+  if (!_startTime || (millis() - _startTime) < _initialUpgradeMs) {
     // Wait _initialUpgradeMs to try and make sure we have a recent version.
     return false;
   }
-
   return true;
 }
 
@@ -211,6 +209,9 @@ void MeshSync::_checkUpdateComplete() {
 }
 
 int MeshSync::sendIfNeeded(uint8_t* dst, uint8_t* pkt, size_t maxlen) {
+  if (!_startTime) {
+    _startTime = millis();
+  }
   if (_updateInProgress) {
     return _sendRequestIfNeeded(dst, pkt, maxlen);
   }

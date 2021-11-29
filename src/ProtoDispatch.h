@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include <utility>
+#include <vector>
 
 bool etherIsBroadcast(const uint8_t* addr);
 
@@ -50,13 +51,17 @@ class ProtoDispatchBase {
  public:
   static constexpr size_t ETH_ADDR_LEN = ProtoDispatchTarget::ETH_ADDR_LEN;
 
+  void addProtocol(uint8_t protocolId, ProtoDispatchTarget* target);
+
+  void begin();
+
   template <typename C>
-  void begin(const C& container) {
-    assert(_targetsStart == nullptr);
-    _targetsStart = std::begin(container);
-    _targetsEnd = std::end(container);
-    _curSendTarget = _targetsStart;
-    this->protoDispatchBegin();
+  __attribute__((deprecated("Prefer using addProtocol to add each protocol"))) void begin(
+      const C& container) {
+    for (const auto& proto : container) {
+      this->addProtocol(proto.first, proto.second);
+    }
+    this->begin();
   }
 
  protected:
@@ -74,9 +79,8 @@ class ProtoDispatchBase {
   virtual void protoDispatchBegin() {}
 
  private:
-  const DispatchProto* _targetsStart = nullptr;
-  const DispatchProto* _targetsEnd = nullptr;
-  const DispatchProto* _curSendTarget = nullptr;
+  std::vector<DispatchProto> _targets;
+  DispatchProto* _curSendTarget = nullptr;
 };
 
 #endif

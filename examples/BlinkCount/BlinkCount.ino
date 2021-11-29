@@ -23,22 +23,33 @@ struct BlinkCountData {
   int numBlinks = 1;
 };
 MeshSyncStruct<BlinkCountData> blinkcount;
-MeshSyncSketch sketchUpdate(1 /* sketch version */);
-DispatchProto protos[] = {  //
-    {1 /* protocol id */, &sketchUpdate},
-    {2 /* protocol id */, &blinkcount}};
+MeshSyncSketch sketchUpdate(4 /* sketch version */);
 
 // If true, set LED_BUILTIN to LOW during blinks; otherwise set it to HIGH.
 static constexpr bool ON_IS_LOW = false;
+
+// If true, crash after startup.  This demonstrates the failsafe OTA
+// functionality; increasing the version number should allow you
+// recover crashing nodes with just a power cycle.
+static constexpr bool CRASH_AFTER_STARTUP = false;
 
 void setup() {
   delay(300);
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
 
-  DISPATCHER.begin(protos);
-  Serial.printf("BlinkCount startup complete, running sketch version %d\n",
-                sketchUpdate.localVersion());
+  DISPATCHER.addProtocol(1, &sketchUpdate);
+  DISPATCHER.begin();
+  Serial.printf("\n\nBlinkCount startup complete version %d, doing initial OTA check at %.3f\n",
+                sketchUpdate.localVersion(), millis() / 1000.);
+  while (!sketchUpdate.upToDate()) {
+    // Fail safe OTA; check for a sketch upgrade before doing anything else.
+    DISPATCHER.espTransmitIfNeeded();
+    delay(1);
+  }
+  DISPATCHER.addProtocol(2, &blinkcount);
+  Serial.printf("BlinkCount startup complete, running sketch version %d at %.3f\n",
+                sketchUpdate.localVersion(), millis() / 1000.);
 }
 
 // Number of blinks remaining before pausing and resetting.
@@ -73,6 +84,9 @@ void blinkLED() {
 }
 
 void loop() {
+  if (CRASH_AFTER_STARTUP) {
+    abort();
+  }
   blinkLED();
   DISPATCHER.espTransmitIfNeeded();
 
