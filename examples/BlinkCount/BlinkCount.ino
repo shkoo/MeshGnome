@@ -45,7 +45,7 @@ void setup() {
   while (!sketchUpdate.upToDate()) {
     // Fail safe OTA; check for a sketch upgrade before doing anything else.
     DISPATCHER.espTransmitIfNeeded();
-    delay(1);
+    yield();
   }
   DISPATCHER.addProtocol(2, &blinkcount);
   Serial.printf("BlinkCount startup complete, running sketch version %d at %.3f\n",
